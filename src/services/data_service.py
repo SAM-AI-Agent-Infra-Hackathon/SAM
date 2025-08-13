@@ -11,7 +11,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from supabase import Client
 
-from ..config.supabase_client import get_client
+from config.supabase_client import get_client
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -48,32 +48,26 @@ class DataService:
         try:
             logger.info(f"Fetching joined data with limit: {limit}")
             
-            # Execute the JOIN query
-            response = self.client.rpc(
-                'get_joined_lca_data',
-                {'record_limit': limit}
-            )
+            # Use the select query with inner join syntax
+            response = self.client.from_('lca_filings') \
+                .select('''
+                    case_number,
+                    employer_name,
+                    job_title,
+                    lca_worksites!inner(
+                        worksite_city,
+                        prevailing_wage
+                    )
+                ''') \
+                .limit(limit) \
+                .execute()
             
-            # If RPC function doesn't exist, fall back to raw SQL
-            if not response.data:
-                logger.info("RPC function not found, using raw query")
-                response = self.client.from_('lca_filings') \
-                    .select('''
-                        case_number,
-                        employer_name,
-                        job_title,
-                        lca_worksites!inner(
-                            worksite_city,
-                            prevailing_wage
-                        )
-                    ''') \
-                    .limit(limit) \
-                    .execute()
-                
-                # Flatten the nested structure
-                flattened_data = []
-                for record in response.data:
-                    for worksite in record.get('lca_worksites', []):
+            # Flatten the nested structure from the join
+            flattened_data = []
+            for record in response.data:
+                worksites = record.get('lca_worksites', [])
+                if worksites:
+                    for worksite in worksites:
                         flattened_data.append({
                             'case_number': record['case_number'],
                             'employer_name': record['employer_name'],
@@ -81,12 +75,18 @@ class DataService:
                             'worksite_city': worksite['worksite_city'],
                             'prevailing_wage': worksite['prevailing_wage']
                         })
-                
-                logger.info(f"Successfully fetched {len(flattened_data)} joined records")
-                return flattened_data
+                else:
+                    # Handle case where there are no worksites (shouldn't happen with inner join)
+                    flattened_data.append({
+                        'case_number': record['case_number'],
+                        'employer_name': record['employer_name'],
+                        'job_title': record['job_title'],
+                        'worksite_city': None,
+                        'prevailing_wage': None
+                    })
             
-            logger.info(f"Successfully fetched {len(response.data)} joined records")
-            return response.data
+            logger.info(f"Successfully fetched {len(flattened_data)} joined records")
+            return flattened_data
             
         except Exception as e:
             logger.error(f"Error fetching joined data: {e}")
