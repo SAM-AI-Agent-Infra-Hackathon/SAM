@@ -1,1 +1,8 @@
 .env
+src/free_agent_example.py
+src/improved_agent.py
+src/huggingface_agent.py
+src/proper_agent.py
+src/simple_agent.py
+src/working_agent.py
+src/test_filters.py
