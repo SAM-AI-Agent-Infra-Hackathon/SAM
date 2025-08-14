@@ -1,3 +1,9 @@
-supabase==2.3.4
-python-dotenv==1.0.0
+supabase>=2.0.0
+python-dotenv>=1.0.0
 asyncio
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-huggingface>=0.0.1
+transformers>=4.30.0
+torch>=2.0.0
+openai>=1.0.0

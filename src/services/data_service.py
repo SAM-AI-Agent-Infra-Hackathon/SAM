@@ -417,6 +417,316 @@ class DataService:
             logger.error(f"Error fetching jobs by title {title}: {e}")
             raise
 
+    # =============================================================================
+    # PERM DATA METHODS
+    # =============================================================================
+
+    def get_sample_perm_data(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Fetch sample PERM disclosure data.
+        
+        Args:
+            limit: Maximum number of records to return (default: 10)
+            
+        Returns:
+            List of dictionaries containing PERM data
+            
+        Raises:
+            Exception: If the query fails
+        """
+        try:
+            logger.info(f"Fetching PERM data with limit: {limit}")
+            
+            response = self.client.from_('perm_disclosure') \
+                .select('*') \
+                .limit(limit) \
+                .execute()
+            
+            # Standardize the data format to match LCA structure
+            standardized_data = []
+            for record in response.data:
+                standardized_data.append({
+                    'case_number': record.get('case_number', 'N/A'),
+                    'company': record.get('employer_name', 'N/A'),
+                    'job_title': record.get('job_title', 'N/A'),
+                    'city': record.get('worksite_city', 'N/A'),
+                    'state': record.get('worksite_state', 'N/A'),
+                    'wage': float(record.get('wage_offer_to', 0)) if record.get('wage_offer_to') else 0.0,
+                    'visa_class': 'PERM',
+                    'decision_date': record.get('decision_date'),
+                    'case_status': record.get('case_status', 'N/A'),
+                    'employer_country': record.get('employer_country', 'N/A'),
+                    'job_info_education': record.get('job_info_education', 'N/A')
+                })
+            
+            logger.info(f"Successfully fetched {len(standardized_data)} PERM records")
+            return standardized_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching PERM data: {e}")
+            raise
+
+    def get_perm_by_city(self, city: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetch PERM filings filtered by worksite city.
+        
+        Args:
+            city: City name to filter by (case-insensitive)
+            limit: Maximum number of records to return (default: 50)
+            
+        Returns:
+            List of dictionaries containing PERM data for the specified city
+            
+        Raises:
+            Exception: If the query fails
+        """
+        try:
+            logger.info(f"Fetching PERM filings for city: {city} with limit: {limit}")
+            
+            response = self.client.from_('perm_disclosure') \
+                .select('*') \
+                .filter('worksite_city', 'ilike', f'%{city}%') \
+                .limit(limit) \
+                .execute()
+            
+            # Standardize the data format
+            standardized_data = []
+            for record in response.data:
+                standardized_data.append({
+                    'case_number': record.get('case_number', 'N/A'),
+                    'company': record.get('employer_name', 'N/A'),
+                    'job_title': record.get('job_title', 'N/A'),
+                    'city': record.get('worksite_city', 'N/A'),
+                    'state': record.get('worksite_state', 'N/A'),
+                    'wage': float(record.get('wage_offer_to', 0)) if record.get('wage_offer_to') else 0.0,
+                    'visa_class': 'PERM',
+                    'decision_date': record.get('decision_date'),
+                    'case_status': record.get('case_status', 'N/A'),
+                    'employer_country': record.get('employer_country', 'N/A'),
+                    'job_info_education': record.get('job_info_education', 'N/A')
+                })
+            
+            logger.info(f"Successfully fetched {len(standardized_data)} PERM filings for city: {city}")
+            return standardized_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching PERM filings by city {city}: {e}")
+            raise
+
+    def get_perm_high_wage_jobs(self, min_wage: float, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetch PERM filings with wage above the specified minimum.
+        
+        Args:
+            min_wage: Minimum wage threshold
+            limit: Maximum number of records to return (default: 50)
+            
+        Returns:
+            List of dictionaries containing high-wage PERM filings
+            
+        Raises:
+            Exception: If the query fails
+        """
+        try:
+            logger.info(f"Fetching PERM high wage jobs above ${min_wage:,.2f} with limit: {limit}")
+            
+            response = self.client.from_('perm_disclosure') \
+                .select('*') \
+                .filter('wage_offer_to', 'gte', min_wage) \
+                .limit(limit * 2) \
+                .execute()
+            
+            # Standardize and sort the data
+            standardized_data = []
+            for record in response.data:
+                wage_value = float(record.get('wage_offer_to', 0)) if record.get('wage_offer_to') else 0.0
+                if wage_value >= min_wage:
+                    standardized_data.append({
+                        'case_number': record.get('case_number', 'N/A'),
+                        'company': record.get('employer_name', 'N/A'),
+                        'job_title': record.get('job_title', 'N/A'),
+                        'city': record.get('worksite_city', 'N/A'),
+                        'state': record.get('worksite_state', 'N/A'),
+                        'wage': wage_value,
+                        'visa_class': 'PERM',
+                        'decision_date': record.get('decision_date'),
+                        'case_status': record.get('case_status', 'N/A'),
+                        'employer_country': record.get('employer_country', 'N/A'),
+                        'job_info_education': record.get('job_info_education', 'N/A')
+                    })
+            
+            # Sort by wage in descending order
+            standardized_data.sort(key=lambda x: x['wage'], reverse=True)
+            standardized_data = standardized_data[:limit]
+            
+            logger.info(f"Successfully fetched {len(standardized_data)} PERM high wage jobs above ${min_wage:,.2f}")
+            return standardized_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching PERM high wage jobs: {e}")
+            raise
+
+    def get_perm_by_company(self, company: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetch PERM filings filtered by employer/company name.
+        
+        Args:
+            company: Company name to filter by (case-insensitive partial match)
+            limit: Maximum number of records to return (default: 50)
+            
+        Returns:
+            List of dictionaries containing PERM filings for the specified company
+            
+        Raises:
+            Exception: If the query fails
+        """
+        try:
+            logger.info(f"Fetching PERM jobs for company: {company} with limit: {limit}")
+            
+            response = self.client.from_('perm_disclosure') \
+                .select('*') \
+                .filter('employer_name', 'ilike', f'%{company}%') \
+                .limit(limit) \
+                .execute()
+            
+            # Standardize the data format
+            standardized_data = []
+            for record in response.data:
+                standardized_data.append({
+                    'case_number': record.get('case_number', 'N/A'),
+                    'company': record.get('employer_name', 'N/A'),
+                    'job_title': record.get('job_title', 'N/A'),
+                    'city': record.get('worksite_city', 'N/A'),
+                    'state': record.get('worksite_state', 'N/A'),
+                    'wage': float(record.get('wage_offer_to', 0)) if record.get('wage_offer_to') else 0.0,
+                    'visa_class': 'PERM',
+                    'decision_date': record.get('decision_date'),
+                    'case_status': record.get('case_status', 'N/A'),
+                    'employer_country': record.get('employer_country', 'N/A'),
+                    'job_info_education': record.get('job_info_education', 'N/A')
+                })
+            
+            logger.info(f"Successfully fetched {len(standardized_data)} PERM jobs for company: {company}")
+            return standardized_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching PERM jobs by company {company}: {e}")
+            raise
+
+    def get_perm_by_title(self, title: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetch PERM filings filtered by job title.
+        
+        Args:
+            title: Job title to filter by (case-insensitive partial match)
+            limit: Maximum number of records to return (default: 50)
+            
+        Returns:
+            List of dictionaries containing PERM filings with matching job titles
+            
+        Raises:
+            Exception: If the query fails
+        """
+        try:
+            logger.info(f"Fetching PERM jobs with title: {title} with limit: {limit}")
+            
+            response = self.client.from_('perm_disclosure') \
+                .select('*') \
+                .filter('job_title', 'ilike', f'%{title}%') \
+                .limit(limit) \
+                .execute()
+            
+            # Standardize the data format
+            standardized_data = []
+            for record in response.data:
+                standardized_data.append({
+                    'case_number': record.get('case_number', 'N/A'),
+                    'company': record.get('employer_name', 'N/A'),
+                    'job_title': record.get('job_title', 'N/A'),
+                    'city': record.get('worksite_city', 'N/A'),
+                    'state': record.get('worksite_state', 'N/A'),
+                    'wage': float(record.get('wage_offer_to', 0)) if record.get('wage_offer_to') else 0.0,
+                    'visa_class': 'PERM',
+                    'decision_date': record.get('decision_date'),
+                    'case_status': record.get('case_status', 'N/A'),
+                    'employer_country': record.get('employer_country', 'N/A'),
+                    'job_info_education': record.get('job_info_education', 'N/A')
+                })
+            
+            logger.info(f"Successfully fetched {len(standardized_data)} PERM jobs with title: {title}")
+            return standardized_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching PERM jobs by title {title}: {e}")
+            raise
+
+    # =============================================================================
+    # COMBINED LCA + PERM METHODS
+    # =============================================================================
+
+    def get_all_jobs_by_city(self, city: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetch both LCA and PERM jobs for a specific city.
+        
+        Args:
+            city: City name to filter by
+            limit: Maximum number of records to return per source (default: 50)
+            
+        Returns:
+            List of dictionaries containing combined LCA and PERM data
+        """
+        try:
+            logger.info(f"Fetching all jobs (LCA + PERM) for city: {city}")
+            
+            # Get LCA jobs
+            lca_jobs = self.get_filings_by_city(city, limit // 2)
+            
+            # Get PERM jobs
+            perm_jobs = self.get_perm_by_city(city, limit // 2)
+            
+            # Combine and return
+            combined_jobs = lca_jobs + perm_jobs
+            logger.info(f"Successfully fetched {len(combined_jobs)} total jobs ({len(lca_jobs)} LCA + {len(perm_jobs)} PERM) for city: {city}")
+            
+            return combined_jobs
+            
+        except Exception as e:
+            logger.error(f"Error fetching all jobs by city {city}: {e}")
+            raise
+
+    def get_all_high_wage_jobs(self, min_wage: float, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Fetch both LCA and PERM high-wage jobs.
+        
+        Args:
+            min_wage: Minimum wage threshold
+            limit: Maximum number of records to return per source (default: 50)
+            
+        Returns:
+            List of dictionaries containing combined high-wage LCA and PERM data
+        """
+        try:
+            logger.info(f"Fetching all high-wage jobs (LCA + PERM) above ${min_wage:,.2f}")
+            
+            # Get LCA high-wage jobs
+            lca_jobs = self.get_high_wage_jobs(min_wage, limit // 2)
+            
+            # Get PERM high-wage jobs
+            perm_jobs = self.get_perm_high_wage_jobs(min_wage, limit // 2)
+            
+            # Combine and sort by wage
+            combined_jobs = lca_jobs + perm_jobs
+            combined_jobs.sort(key=lambda x: x['wage'], reverse=True)
+            combined_jobs = combined_jobs[:limit]
+            
+            logger.info(f"Successfully fetched {len(combined_jobs)} total high-wage jobs ({len(lca_jobs)} LCA + {len(perm_jobs)} PERM)")
+            
+            return combined_jobs
+            
+        except Exception as e:
+            logger.error(f"Error fetching all high-wage jobs: {e}")
+            raise
+
 
 # Convenience functions for direct usage
 def get_sample_joined_data(limit: int = 10) -> List[Dict[str, Any]]:

@@ -6,3 +6,5 @@ src/proper_agent.py
 src/simple_agent.py
 src/working_agent.py
 src/test_filters.py
+src/oflc_excel/LCA_Disclosure_Data_FY2025_Q2.xlsx
+src/LCA_Disclosure_Data_FY2025_Q2.xlsx

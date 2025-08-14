@@ -221,8 +221,12 @@ def run_agent_query(agent: AgentExecutor, query: str) -> str:
         else:
             result = str(response)
         
-        # Check if result looks valid
-        if result and len(result) > 50 and "error" not in result.lower():
+        # Accept any non-empty output from the agent, unless it's a ReAct trace
+        if result and result.strip() and ("error" not in result.lower()):
+            # If the model returned internal planning (Thought/Action), don't surface it
+            lower = result.lower()
+            if ("thought:" in lower and "action:" in lower) or (result.strip().startswith("Thought:")):
+                raise Exception("Agent returned planning trace instead of final answer")
             return result
         else:
             raise Exception("LangChain agent returned invalid response")
@@ -248,9 +252,26 @@ def run_agent_query(agent: AgentExecutor, query: str) -> str:
             # Final fallback: Direct tool usage
             print(f"🔧 Using direct tool fallback...")
             try:
+                import re
                 from tools import find_jobs_by_city, get_sample_lca_data, find_high_wage_jobs
-                
+
+                def _parse_wage(q: str) -> str:
+                    s = q.lower()
+                    # look for patterns like 100k, $120,000, 120000, 100$
+                    m = re.search(r"\$?\s*(\d[\d,]*)(k)?", s)
+                    if not m:
+                        return None
+                    num = m.group(1).replace(",", "")
+                    val = float(num)
+                    if m.group(2) == 'k' or val < 1000:
+                        val *= 1000
+                    return str(int(val))
+
                 query_lower = query.lower()
+                # Wage-specific intent
+                wage = _parse_wage(query)
+                if wage:
+                    return find_high_wage_jobs.invoke({"min_wage_str": wage})
                 if "sample" in query_lower:
                     return get_sample_lca_data.invoke({"limit_str": "5"})
                 elif "san francisco" in query_lower:
