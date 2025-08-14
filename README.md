@@ -1,4 +1,5 @@
 # SAM – Immigration Chatbot (H‑1B/PERM) with Live Sources
+![ezgif-3ce569fd8b8f7c](https://github.com/user-attachments/assets/d5f80499-3b03-4e11-a1bb-f1245d90d627)
 
 SAM is an AI assistant for international students and workers navigating U.S. employment-based visas (H‑1B, PERM). It combines:
 
@@ -6,6 +7,8 @@ SAM is an AI assistant for international students and workers navigating U.S. em
 - A modern dark-themed chat UI
 - A Flask API backend with an immigration-aware agent
 - Supabase-backed LCA/PERM data access and LangChain tools
+
+
 
 This README describes the problem being solved, how SAM helps, how to run the app, and the technical architecture. The lower half retains detailed Supabase data-service docs.
 
