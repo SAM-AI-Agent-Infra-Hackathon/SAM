@@ -26,6 +26,8 @@ from web_sources import (
     get_h1b_majors_study,
     get_school_sponsors_links,
     get_company_h1b_links,
+    get_company_h1b_counts,
+    get_school_h1b_counts,
 )
 
 # Configure logging
@@ -126,6 +128,35 @@ class EnhancedImmigrationAgent:
             m = re.search(r"(?:from|at)\s+([A-Za-z0-9&.,'()\-\s]{3,})", query, flags=re.I)
             uni = m.group(1).strip() if m else ""
             return ("school_sponsors", {"university": uni})
+        # School FY petition counts (e.g., "how many from my school last year")
+        if ("how many" in q or "number" in q) and ("school" in q or "university" in q) \
+           and (re.search(r"\bh[-\u2010-\u2015]?\s?1b\b", q) or "petition" in q or "lca" in q):
+            # Try to pull explicit university using several patterns
+            uni = ""
+            patterns = [
+                r"(?:go to|attend|study(?:ing)? at)\s+([A-Za-z][A-Za-z0-9&.,'()\-\s]{3,})",
+                r"\b(university of\s+[A-Za-z][A-Za-z0-9&.,'()\-\s]{2,})",
+                r"\b([A-Za-z][A-Za-z0-9&.,'()\-\s]{2,}\s+university)\b",
+                r"\b([A-Za-z][A-Za-z0-9&.,'()\-\s]{2,}\s+college)\b",
+                r"(?:from|at)\s+((?!my\s+school)[A-Za-z][A-Za-z0-9&.,'()\-\s]{3,})",
+            ]
+            for pat in patterns:
+                m = re.search(pat, query, flags=re.I)
+                if m:
+                    uni = m.group(1).strip()
+                    break
+            # Trim trailing connectors/clauses if any
+            if uni:
+                stop_tokens = [" received ", " filed ", " last year", " this year", " for ", " with ", "?", ".", ",", ";", ":"]
+                low = uni.lower()
+                cut = len(uni)
+                for tok in stop_tokens:
+                    idx = low.find(tok)
+                    if idx != -1:
+                        cut = min(cut, idx)
+                uni = uni[:cut].strip()
+            # Interpret 'last year' as FY 2024 for now
+            return ("school_counts", {"university": uni, "fy": "2024"})
         # Company H-1B counts
         if ("how many" in q or "how much" in q or "number" in q) \
            and ("company" in q or "employer" in q or "from" in q) \
@@ -153,14 +184,29 @@ class EnhancedImmigrationAgent:
             lines.append("📊 Top H-1B Petitioners (FY 2025)")
             lines.append("=" * 60)
             lines.append("")
-            srcs = get_top_h1b_companies_2025()
-            lines.append("• This summary lists leading petitioners for FY 2025.")
-            lines.append("")
-            lines.append("Sources:")
-            for s in srcs:
-                snippet = f" — {s.snippet}" if s.snippet else ""
-                lines.append(f"• {s.title}: {s.url}{snippet}")
-            return "\n".join(lines).rstrip()
+            sources = get_top_h1b_companies_2025()
+            if sources and sources[0].snippet and "|" in sources[0].snippet:
+                source = sources[0]
+                scraped_data = source.snippet.strip().split('\n')
+                
+                bullets = []
+                for line in scraped_data:
+                    parts = line.split('|')
+                    if len(parts) == 3:
+                        company, petitions, salary = parts
+                        bullets.append(f"• {company.title()} – {petitions} petitions (avg salary: {salary})")
+                
+                if bullets:
+                    bullets_text = "\n".join(bullets)
+                    response = f"""✅ According to MyVisaJobs’ latest H-1B Visa Report, the top petitioning companies include:
+
+{bullets_text}
+
+Source: {source.url}"""
+                    return response
+            
+            # Fallback if scraping fails
+            return "I couldn't retrieve live data at the moment. Please check MyVisaJobs directly for the latest reports: https://www.myvisajobs.com/Reports/"
 
         if intent == "majors_approval":
             lines.append("🎓 Majors With Higher H-1B Certification Odds")
@@ -171,6 +217,59 @@ class EnhancedImmigrationAgent:
             lines.append("")
             lines.append("Sources:")
             for s in get_h1b_majors_study():
+                lines.append(f"• {s.title}: {s.url}")
+            return "\n".join(lines).rstrip()
+
+        if intent == "school_counts":
+            uni = (args.get("university") or "").strip()
+            fy = int((args.get("fy") or "2024").strip() or 2024)
+            lines.append("🏫 University H-1B Petition Counts (FY {})".format(fy))
+            lines.append("=" * 60)
+            lines.append("")
+            if not uni:
+                lines.append("• Could you tell me your university’s name? I can then tell you the total filings using MyVisaJobs data.")
+                return "\n".join(lines).rstrip()
+
+            # Try live scrape
+            try:
+                sources = get_school_h1b_counts(uni, fy)
+            except Exception:
+                sources = []
+
+            parsed = {}
+            src_url = None
+            if sources:
+                src = sources[0]
+                src_url = src.url
+                for row in (src.snippet or "").splitlines():
+                    if "=" in row:
+                        k, v = row.split("=", 1)
+                        parsed[k.strip()] = v.strip()
+
+            if parsed:
+                name = parsed.get('University', uni)
+                lines.append(f"• University: {name}")
+                if parsed.get('LCA_Total'):
+                    lines.append(f"• LCA filings: {int(parsed['LCA_Total']):,}")
+                # Prefer FY-specific petitions if available
+                key_pet = f"FY{fy}_Petitions"
+                if parsed.get(key_pet):
+                    lines.append(f"• FY{fy} I-129 petitions: {int(parsed[key_pet]):,}")
+                if parsed.get('AvgSalary'):
+                    lines.append(f"• Average salary: ${int(parsed['AvgSalary']):,}")
+                if parsed.get('Industry'):
+                    lines.append(f"• Industry: {parsed['Industry']}")
+                lines.append("")
+                if src_url:
+                    lines.append(f"Source: {src_url}")
+                return "\n".join(lines).rstrip()
+
+            # Fallback: provide search links for the university
+            lines.append(f"• University: {uni}")
+            lines.append("• I couldn't parse structured FY data. Check these sources:")
+            lines.append("")
+            lines.append("Sources:")
+            for s in get_school_sponsors_links(uni):
                 lines.append(f"• {s.title}: {s.url}")
             return "\n".join(lines).rstrip()
 
@@ -198,7 +297,39 @@ class EnhancedImmigrationAgent:
             if not comp:
                 lines.append("• Please provide the company legal name.")
             else:
-                lines.append(f"• Company: {comp}")
+                # Try live scrape first
+                try:
+                    sources = get_company_h1b_counts(comp)
+                except Exception as e:
+                    sources = []
+
+                parsed = {}
+                src_url = None
+                if sources:
+                    src = sources[0]
+                    src_url = src.url
+                    for row in (src.snippet or "").splitlines():
+                        if "=" in row:
+                            k, v = row.split("=", 1)
+                            parsed[k.strip()] = v.strip()
+
+                if parsed:
+                    lines.append(f"• Company: {parsed.get('Company', comp)}")
+                    if parsed.get('LCA_Total'):
+                        lines.append(f"• LCA filings (recent years): {int(parsed['LCA_Total']):,}")
+                    if parsed.get('FY2025_Petitions'):
+                        lines.append(f"• FY2025 I-129 petitions: {int(parsed['FY2025_Petitions']):,}")
+                    if parsed.get('FY2025_Approved') and parsed.get('FY2025_Denied'):
+                        lines.append(
+                            f"• FY2025 outcomes: {int(parsed['FY2025_Approved']):,} approved, {int(parsed['FY2025_Denied']):,} denied"
+                        )
+                    lines.append("")
+                    if src_url:
+                        lines.append(f"Source: {src_url}")
+                    return "\n".join(lines).rstrip()
+
+            # Fallback to link sources if no structured data
+            lines.append(f"• Company: {comp}")
             lines.append("• Use these to view recent annual counts (MyVisaJobs) and multi-year totals (H1BGrader).")
             lines.append("")
             lines.append("Sources:")

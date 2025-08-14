@@ -1,6 +1,83 @@
-# Supabase LCA Data Fetcher
+# SAM – Immigration Chatbot (H‑1B/PERM) with Live Sources
 
-A Python project for connecting to Supabase and fetching joined data from `lca_filings` and `lca_worksites` tables. Designed with clean architecture principles and ready for integration with LangChain/LangGraph for AI-powered data querying.
+SAM is an AI assistant for international students and workers navigating U.S. employment-based visas (H‑1B, PERM). It combines:
+
+- Live website scraping (MyVisaJobs) for employer/university H‑1B petition data
+- A modern dark-themed chat UI
+- A Flask API backend with an immigration-aware agent
+- Supabase-backed LCA/PERM data access and LangChain tools
+
+This README describes the problem being solved, how SAM helps, how to run the app, and the technical architecture. The lower half retains detailed Supabase data-service docs.
+
+## ❗ Problems Being Addressed (2025)
+
+- **Complex, opaque H‑1B/PERM processes**: Strict timelines, lottery selection, confusing steps (LCA, I‑129, etc.).
+- **Sponsorship job search friction**: Hard to find employers willing/able to sponsor amid higher costs and wage rules.
+- **Uncertainty and limited access to clear info**: Changing procedures, XLSX disclosures, and administrative delays make self‑service hard.
+- **Rising costs and legal complexity**: Higher filing fees and employer burden reduce entry‑level sponsorship opportunities.
+
+## ✅ How SAM Helps
+
+- **Centralizes actionable data**: Scrapes MyVisaJobs reports/employer pages and integrates Supabase LCA/PERM records.
+- **Chatbot guidance with sources**: Clear answers with clickable source bubbles; prompts for missing details (e.g., your university).
+- **Improves job match efficiency**: Surfaces real employers and schools with recent filings and petitions.
+- **Supports visa pathway planning**: Tools for LCA+PERM queries; ready for LangChain agents to reason over options.
+
+## ✨ Key Features
+
+- **Live MyVisaJobs scraping**
+  - Top H‑1B petitioners (FY2025)
+  - Company‑specific counts (incl. FY2025 I‑129 outcomes when available)
+  - University‑specific counts (FY‑aware; slug URL handling like `employer/university-michigan/`)
+- **Modern chat UI**: Dark theme, macOS‑style window chrome, message bubbles, typing indicators, quick actions, source link bubbles.
+- **Flask API backend**: `/api/chat` endpoint, structured responses, robust error handling.
+- **Immigration‑aware agent**: Detects intents (e.g., “how many from my school last year?”) and fetches live + DB data.
+- **Supabase data service**: Unified LCA/PERM methods; LangChain tools for combined queries.
+
+## 🚀 Quick Start (Chat App)
+
+### 1) Environment
+
+Create `.env` with:
+
+```
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+# Optional if using OpenAI models via your agent/orchestration
+OPENAI_API_KEY=...
+```
+
+### 2) Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3) Run the Flask app
+
+```bash
+python app.py
+```
+
+Open the printed local URL and use the chat interface.
+
+## 🔌 API
+
+- `POST /api/chat`
+  - Body: `{ "message": "your question" }`
+  - Returns: formatted text plus source links (UI renders as small bubbles)
+
+## 🧱 Components (selected files)
+
+- `app.py` – Flask server (serves UI and `/api/chat`)
+- `chat_ui.html` – Dark themed web UI
+- `src/immigration_main_agent.py` – Enhanced immigration agent
+- `src/web_sources.py` – Live scrapers (top companies, company counts, school counts)
+- `src/services/data_service.py` – Supabase LCA/PERM data service
+- `src/langchain_tools.py` – LangChain tool definitions (LCA/PERM/combined)
+- `src/immigration_agent.py`, `src/agent.py` – Orchestration helpers
+
+---
 
 ## 🏗️ Project Structure
 

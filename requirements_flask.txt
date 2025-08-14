@@ -1,0 +1,8 @@
+flask==2.3.3
+flask-cors==4.0.0
+python-dotenv==1.0.0
+httpx==0.24.1
+supabase==1.0.4
+langchain==0.0.350
+langchain-openai==0.0.2
+beautifulsoup4==4.12.2
