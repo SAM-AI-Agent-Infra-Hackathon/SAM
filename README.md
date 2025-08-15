@@ -1,6 +1,7 @@
 # 🏆 Hackathon Finalist — AI Agent & Infra Hackathon 2025
 
-**Built for the [AI Agent & Infra Hackathon 2025](https://devpost.com/) (Aug 12–14, 2025)**  
+**Built for the [AI Agent & Infra Hackathon 2025](https://ai-agent-infra.devpost.com/?ref_feature=challenge&ref_medium=your-open-hackathons&ref_content=Recently+ended&_gl=1*1hz96tq*_gcl_au*OTUwNDM0ODgwLjE3NTUxNzc1MTY.*_ga*NjY3MjQxOTU0LjE3NTUxNzc1MTY.*_ga_0YHJK3Y10M*czE3NTUyMjQ3NzckbzIkZzAkdDE3NTUyMjQ3NzckajYwJGwwJGgw) (Aug 12–14, 2025)**
+
 Finalist in the 36-hour competition hosted by Lux Capital, Modal, Cognition, AWS, and Ramp.  
 
 # SAM – Immigration Chatbot (H‑1B/PERM) with Live Sources
